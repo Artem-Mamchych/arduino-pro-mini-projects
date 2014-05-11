@@ -34,8 +34,10 @@
 #define CALIB_VAL_Y 427
 #define CALIB_VAL_Z 565
 
-int x, y, z;
-int prev_x, prev_y, prev_z;
+int x, y, z, accel;
+int prev_x, prev_y, prev_z, prev_accel;
+int width, height;
+int graph_pos = 0;
 uint16_t time1;
 uint16_t time2;
 
@@ -52,7 +54,9 @@ void setup(void) {
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   tft.fillScreen(ST7735_BLACK);
   tft.setRotation(3);
-  tft.setTextSize(3);
+  tft.setTextSize(2); //3
+  width = tft.width();
+  height = tft.height();
 }
 
 void loop() {
@@ -60,10 +64,11 @@ void loop() {
    
   //uartPrintValues()
   tftCleanText();
-  tftPrintValues();   
-
+  tftPrintValues();
+  
+  tftPrintGraph();
   //Refresh Rate
-  delay(50);
+  delay(80);
 //  delay(500);
 //25Hz = 40ms
 //10Hz = 100ms
@@ -71,24 +76,18 @@ void loop() {
 //  time1 = millis();
 //  clearLCD()
 //  Serial.println(millis() - time1); //LCD Cleaning time = 93ms
-
-//  // a single pixel
-//  tft.drawPixel(tft.width()/2, tft.height()/2, ST7735_GREEN);
-//  delay(500);
-//
-//  // optimized lines
-//  testfastlines(ST7735_RED, ST7735_BLUE);
-//  delay(500);
 }
 
 void getAccelValues() {
   prev_x = x;
   prev_y = y;
   prev_z = z;  
+  prev_accel = accel;
   
   x = analogRead(PIN_X) - CALIB_VAL_X;
   y = analogRead(PIN_Y) - CALIB_VAL_Y;
   z = analogRead(PIN_Z) - CALIB_VAL_Z;
+  accel = abs(x) + abs(y);
 }
 
 void clearLCD() {
@@ -102,16 +101,6 @@ void testdrawtext(char *text, uint16_t color) {
   tft.print(text);
 }
 
-void testfastlines(uint16_t color1, uint16_t color2) {
-  tft.fillScreen(ST7735_BLACK);
-  for (int16_t y=0; y < tft.height(); y+=5) {
-    tft.drawFastHLine(0, y, tft.width(), color1);
-  }
-  for (int16_t x=0; x < tft.width(); x+=5) {
-    tft.drawFastVLine(x, 0, tft.height(), color2);
-  }
-}
-
 void uartPrintValues() {
   // Вывод в Serial monitor
   Serial.print(" X: ");
@@ -123,6 +112,16 @@ void uartPrintValues() {
 }
 
 void tftPrintGraph() {
+  if (graph_pos >= width) { //If at the edge of the window, go back to the beginning:
+    tft.fillScreen(ST7735_BLACK);
+    graph_pos = 0;
+  } else {
+    tft.drawPixel(graph_pos, x, ST7735_BLUE);
+    tft.drawPixel(graph_pos, y, ST7735_RED);
+    tft.drawPixel(graph_pos, accel, ST7735_WHITE);    
+//    tft.drawFastHLine(x, y, width, ST7735_RED);
+    ++graph_pos;
+  }
 }
 
 void tftCleanText() {
@@ -135,18 +134,17 @@ void tftCleanText() {
   tft.println(prev_y);
   tft.print("Z:");
   tft.println(prev_z);
-//  tft.print("Ac");
-//  tft.println(abs(x) + abs(y));
+  tft.print("Ac");
+  tft.println(prev_accel);
 }
 
 void tftPrintValues() {
+//  time2 = millis();    
   tft.setCursor(0, 0);
-  time2 = millis();  
 //  tft.fillScreen(ST7735_BLACK);
 //  tft.fillRect(34, 0, 130, 95, ST7735_BLACK);
 //  tft.setTextSize(3);
-  tft.setTextColor(ST7735_YELLOW);
-  
+  tft.setTextColor(ST7735_BLUE);
   tft.print("X:");
   tft.println(x);
   tft.setTextColor(ST7735_RED);
@@ -155,9 +153,11 @@ void tftPrintValues() {
   tft.setTextColor(ST7735_GREEN);  
   tft.print("Z:");
   tft.println(z);
-  tft.setTextColor(ST7735_BLUE);
-//  tft.print("Ac");
-//  tft.println(abs(x) + abs(y));
+  tft.setTextColor(ST7735_YELLOW);
+  tft.print("Ac");
+  tft.println(accel);
 //  Serial.print("LCD ");
-  Serial.println(millis() - time2); //Text printing time = 42ms
+
+//  Serial.println(millis() - time2); //Text printing time = 42ms
+//In v2 =29ms (without abs(x) + abs(y))
 }
