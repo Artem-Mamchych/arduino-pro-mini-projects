@@ -8,7 +8,7 @@
 //Using hardware SPI pins for max speed
 Adafruit_ST7735 tft = Adafruit_ST7735(); //Library was optimized for max speed, sources available here: https://github.com/Artem-Mamchych/Adafruit-ST7735-Library
 
-//MMA7361
+//MMA7361 definitions
 #define PIN_X     A0
 #define PIN_Y     A1
 #define PIN_Z     A2
@@ -29,6 +29,28 @@ Adafruit_ST7735 tft = Adafruit_ST7735(); //Library was optimized for max speed, 
 #define CALIB_VAL_X 407
 #define CALIB_VAL_Y 427
 #define CALIB_VAL_Z 565
+//MMA7361 definitions END
+
+//BICYCLE SPEED SENSOR definitions
+#define TYRE_CIRCUMFERENCE 2074 //mm
+#define DEBOUNCE_DELAY 15 //Debouncing Time in Milliseconds
+
+volatile unsigned long time = 0;
+volatile unsigned long speed_value = 0, prev_speed_value = 0;
+
+//Interrupt handler for reed switch on pin 2
+void speedReedSwInterrupt() {
+  if((long)(millis() - time) >= DEBOUNCE_DELAY) {
+    speed_value = TYRE_CIRCUMFERENCE/(millis() - time);
+    time = millis();
+  }
+}
+
+void setupSpeedSensorInterrupt() {
+  attachInterrupt(0, speedReedSwInterrupt, RISING);
+  speed_value = 0;
+}
+//BICYCLE SPEED SENSOR definitions END
 
 int x, y, z, accel;
 int prev_x, prev_y, prev_z, prev_accel;
@@ -45,9 +67,10 @@ void setup(void) {
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, LCD controller
   tft.fillScreen(ST7735_BLACK);
   tft.setRotation(3);
-  tft.setTextSize(2);
   width = tft.width();
   height = tft.height();
+  
+  setupSpeedSensorInterrupt(); 
 }
 
 void loop() {
@@ -100,9 +123,9 @@ void uartPrintValues() {
 }
 
 void tftPrintGraph() {
-//  tft.drawPixel(graph_pos, accel, ST7735_WHITE); 
   tft.drawLine(graph_pos-1, (prev_accel+512)>>3, graph_pos, (accel+512)>>3, ST7735_YELLOW);
-      
+  tft.drawLine(graph_pos-1, prev_speed_value, graph_pos, speed_value, ST7735_WHITE);
+
   tft.drawPixel(graph_pos, (x+512)>>3, ST7735_BLUE);
   tft.drawPixel(graph_pos, (y+512)>>3, ST7735_RED);   
   ++graph_pos;
@@ -115,34 +138,29 @@ void tftCleanText() {
     graph_pos = 1;
   } else {
     tft.setTextColor(ST7735_BLACK);
-    
-    tft.print("X:");
-    tft.println(prev_x);
-    tft.print("Y:");
-    tft.println(prev_y);
-    tft.print("Z:");
-    tft.println(prev_z);
-    tft.print("Ac");
-    tft.println(prev_accel);
-  }  
-  
-  //drawChar(uint16_t x, uint16_t y, char c, uint16_t color, uint16_t bg, uint8_t size);
+
+    tft.setTextSize(3);
+    tft.println(prev_speed_value);
+
+    tft.setTextSize(2);
+    tft.print("X:"); tft.print(prev_x); tft.print(" Z:"); tft.println(prev_z);
+    tft.print("Y:"); tft.print(prev_y); tft.print(" A:"); tft.println(prev_accel);
+  }
 }
 
-void tftPrintValues() {  
+void tftPrintValues() {
   tft.setCursor(0, 0);
 //  tft.fillRect(34, 0, 130, 95, ST7735_BLACK);
 
+  tft.setTextColor(ST7735_WHITE);
+  tft.setTextSize(3);
+  prev_speed_value = speed_value;
+  tft.println(speed_value);
+  
+  tft.setTextSize(2);
   tft.setTextColor(ST7735_BLUE);
-  tft.print("X:");
-  tft.println(x);
-  tft.setTextColor(ST7735_RED);
-  tft.print("Y:");
-  tft.println(y);
-  tft.setTextColor(ST7735_GREEN);  
-  tft.print("Z:");
-  tft.println(z);
-  tft.setTextColor(ST7735_YELLOW);
-  tft.print("Ac");
-  tft.println(accel);
+  tft.print("X:"); tft.print(x); tft.setTextColor(ST7735_RED); tft.print(" Z:"); tft.println(z);
+
+  tft.setTextColor(ST7735_GREEN);
+  tft.print("Y:");   tft.print(y); tft.setTextColor(ST7735_YELLOW); tft.print(" A:"); tft.println(accel);
 }
