@@ -7,6 +7,8 @@
 //LCD pin rst  8
 //Using hardware SPI pins for max speed
 Adafruit_ST7735 tft = Adafruit_ST7735(); //Library was optimized for max speed, sources available here: https://github.com/Artem-Mamchych/Adafruit-ST7735-Library
+#define MIN_LCD_FEFRESH_DELAY 50 //50ms
+unsigned long currentFrameMillis, previousFrameMillis = 0;
 
 //MMA7361 definitions
 #define PIN_X     A0
@@ -56,7 +58,7 @@ int x, y, z, accel;
 int prev_x, prev_y, prev_z, prev_accel;
 int width, height;
 int graph_pos = 0;
-uint16_t lcdCleanTime, lcdFillTime;
+unsigned long lcdCleanTime, lcdFillTime;
 
 void setup(void) {
   pinMode(PIN_SLEEP, OUTPUT);
@@ -74,20 +76,27 @@ void setup(void) {
 }
 
 void loop() {
-  getAccelValues();
-   
-  //uartPrintValues()
-//  lcdCleanTime = millis();
-  tftCleanText();
-//  lcdFillTime = millis();
-  tftPrintValues();
-  tftPrintGraph();
-  
-//  Serial.print(lcdFillTime - lcdCleanTime); //clean time, ms
-//  Serial.print(" /");
-//  Serial.println(millis() - lcdFillTime); //draw time, ms 
+  currentFrameMillis = millis()
+  if (currentFrameMillis - previousFrameMillis > MIN_LCD_FEFRESH_DELAY) {
+    previousFrameMillis = currentFrameMillis; 
+    
+    //LCD thread
 
-  delay(80); //Refresh Rate
+    //uartPrintValues()
+    lcdCleanTime = millis();
+    tftCleanText();
+    lcdFillTime = millis();
+    tftPrintValues();
+    tftPrintGraph();
+
+    Serial.print(millis() - lcdFillTime); //draw time, ms  
+    Serial.print("/");
+    Serial.println(lcdFillTime - lcdCleanTime); //clean time, ms
+  } else {
+    getAccelValues(); //Add filtering
+    delay(5);
+  }
+//  delay(80); //Refresh Rate
 }
 
 void getAccelValues() {
