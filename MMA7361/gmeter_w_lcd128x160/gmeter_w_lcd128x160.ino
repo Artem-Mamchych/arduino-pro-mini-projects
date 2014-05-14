@@ -7,7 +7,7 @@
 //LCD pin rst  8
 //Using hardware SPI pins for max speed
 Adafruit_ST7735 tft = Adafruit_ST7735(); //Library was optimized for max speed, sources available here: https://github.com/Artem-Mamchych/Adafruit-ST7735-Library
-#define MIN_LCD_FEFRESH_DELAY 50 //50ms
+#define MIN_LCD_FEFRESH_DELAY 60 //60ms
 unsigned long currentFrameMillis, previousFrameMillis = 0;
 
 //MMA7361 definitions
@@ -39,11 +39,15 @@ unsigned long currentFrameMillis, previousFrameMillis = 0;
 
 volatile unsigned long time = 0;
 volatile unsigned long speed_value = 0, prev_speed_value = 0;
+volatile unsigned long mileage = 0, prev_mileage = 0;
 
 //Interrupt handler for reed switch on pin 2
 void speedReedSwInterrupt() {
   if((long)(millis() - time) >= DEBOUNCE_DELAY) {
     speed_value = TYRE_CIRCUMFERENCE/(millis() - time);
+    mileage += TYRE_CIRCUMFERENCE/1000;
+    if(speed_value > 99) speed_value = 99;
+    
     time = millis();
   }
 }
@@ -76,7 +80,7 @@ void setup(void) {
 }
 
 void loop() {
-  currentFrameMillis = millis()
+  currentFrameMillis = millis();
   if (currentFrameMillis - previousFrameMillis > MIN_LCD_FEFRESH_DELAY) {
     previousFrameMillis = currentFrameMillis; 
     
@@ -93,18 +97,15 @@ void loop() {
     Serial.print("/");
     Serial.println(lcdFillTime - lcdCleanTime); //clean time, ms
   } else {
+    Serial.print(":");
+//    Serial.print(millis() - currentFrameMillis);
     getAccelValues(); //Add filtering
-    delay(5);
+    delay(10);
   }
 //  delay(80); //Refresh Rate
 }
 
 void getAccelValues() {
-  prev_x = x;
-  prev_y = y;
-  prev_z = z;  
-  prev_accel = accel;
-  
   x = analogRead(PIN_X) - CALIB_VAL_X;
   y = analogRead(PIN_Y) - CALIB_VAL_Y;
   z = analogRead(PIN_Z) - CALIB_VAL_Z;
@@ -148,12 +149,8 @@ void tftCleanText() {
   } else {
     tft.setTextColor(ST7735_BLACK);
 
-    tft.setTextSize(3);
-    tft.println(prev_speed_value);
-
-    tft.setTextSize(2);
-    tft.print("X:"); tft.print(prev_x); tft.print(" Z:"); tft.println(prev_z);
-    tft.print("Y:"); tft.print(prev_y); tft.print(" A:"); tft.println(prev_accel);
+    tftPrintSpeed(false);
+    tftPrintAccelerometerXYZ(false);
   }
 }
 
@@ -161,15 +158,38 @@ void tftPrintValues() {
   tft.setCursor(0, 0);
 //  tft.fillRect(34, 0, 130, 95, ST7735_BLACK);
 
-  tft.setTextColor(ST7735_WHITE);
-  tft.setTextSize(3);
-  prev_speed_value = speed_value;
-  tft.println(speed_value);
-  
-  tft.setTextSize(2);
-  tft.setTextColor(ST7735_BLUE);
-  tft.print("X:"); tft.print(x); tft.setTextColor(ST7735_RED); tft.print(" Z:"); tft.println(z);
+  tftPrintSpeed(true);
+  tftPrintAccelerometerXYZ(true);
+}
 
-  tft.setTextColor(ST7735_GREEN);
-  tft.print("Y:");   tft.print(y); tft.setTextColor(ST7735_YELLOW); tft.print(" A:"); tft.println(accel);
+inline void tftPrintSpeed(boolean useColor) { //useColor = false used only in clean LCD function
+  if (useColor) {
+    prev_speed_value = speed_value;
+    prev_mileage = mileage; 
+  }
+
+  if (useColor) tft.setTextColor(ST7735_WHITE);
+  tft.setTextSize(3);
+  tft.print(prev_speed_value); tft.print("/"); tft.println(prev_mileage); 
+}
+
+inline void tftPrintAccelerometerXYZ(boolean useColor) { //useColor = false used only in clean LCD function
+  tft.setTextSize(2);
+
+  if (useColor) {
+    prev_x = x;
+    prev_y = y;
+    prev_z = z;  
+    prev_accel = accel;
+  }
+
+  if (useColor) tft.setTextColor(ST7735_BLUE);
+  tft.print("X:"); tft.print(prev_x);
+  if (useColor) tft.setTextColor(ST7735_RED);
+  tft.print(" Z:"); tft.println(prev_z);
+
+  if (useColor) tft.setTextColor(ST7735_GREEN);
+  tft.print("Y:");   tft.print(prev_y);
+  if (useColor) tft.setTextColor(ST7735_YELLOW);
+  tft.print(" A:"); tft.println(prev_accel);  
 }
