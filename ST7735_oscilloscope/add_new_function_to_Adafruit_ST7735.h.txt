@@ -1,0 +1,1 @@
+drawFastLine(int8_t x, int8_t y, int8_t h,int8_t l, uint16_t color),
