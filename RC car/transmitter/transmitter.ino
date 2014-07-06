@@ -1,8 +1,22 @@
+//ST7735 LCD library
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7735.h> // Hardware-specific library
+#include <SPI.h>
 
+//LCD pin cs   10
+//LCD pin dc   9
+//LCD pin rst  8
+//Using hardware SPI pins for max speed
+Adafruit_ST7735 tft = Adafruit_ST7735(); //Library was optimized for max speed, sources available here: https://github.com/Artem-Mamchych/Adafruit-ST7735-Library
+#define LCD_REFRESH_INTERVAL 400
+unsigned long currentFrameMillis, previousFrameMillis = 0;
+int width, height;
+int graph_pos = 0;
+
+//Other code
 #define PIN_LED 13
 int ledState = LOW;
 long previousMillis = 0;
-#define LCD_REFRESH_INTERVAL 1000
 
 #define PIN_X A0
 #define PIN_Y A1
@@ -21,7 +35,18 @@ int previousSteerValue = 0;
 #include <Servo.h>
 Servo myservo;
 
+int steerValue, accelValue;
+int prev_steerValue, prev_accelValue;
+
 void setup() {
+  //LCD init
+  tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, LCD controller
+  tft.fillScreen(ST7735_BLACK);
+  tft.setRotation(3);
+  width = tft.width();
+  height = tft.height();  
+  
+  //Pins setup
   pinMode(PIN_LED, OUTPUT); 
   myservo.attach(PIN_STEER_SERVO);
   
@@ -30,10 +55,11 @@ void setup() {
 
 void loop() {
   int throttle = analogRead(PIN_X);
-  delay(30); //this small pause is needed between reading analog pins, otherwise we get the same value twice
-  int steer = analogRead(PIN_Y) + CALIBRATED_OFFSET_Y;
+  accelValue = map(throttle, 0, 1023, 0, 179);  
+  delay(40); //this small pause is needed between reading analog pins, otherwise we get the same value twice
   
-  int steerValue = map(steer, 0, 1023, 0, 179);
+  int steer = analogRead(PIN_Y) + CALIBRATED_OFFSET_Y;  
+  steerValue = map(steer, 0, 1023, 0, 179);
 
   unsigned long currentMillis = millis();
   if(currentMillis - previousMillis > LCD_REFRESH_INTERVAL) {
@@ -45,6 +71,9 @@ void loop() {
       ledState = LOW;
       
       digitalWrite(PIN_LED, ledState);
+      
+      //LCD thread
+      tftDrawFrame();
   }
 
   Serial.print(throttle);
@@ -84,10 +113,33 @@ void loop() {
   }
   Serial.println("");
   delay(30);
-  
-  //TODO add trim functionality
-  //thermal protection
-  //add unger-voltage protection
 }
 
+void tftDrawFrame() {
+  //Clean-up previous frame
+  tft.setCursor(0, 0);
+  if (graph_pos >= width) { //If at the edge of the window, go back to the beginning:
+    tft.fillScreen(ST7735_BLACK);
+    graph_pos = 1;
+  } else {
+    tft.setTextColor(ST7735_BLACK);
+
+    tftPrintDbgInfo(false);
+  }
+  
+  //Draw new frame
+  tft.setCursor(0, 0);
+  tftPrintDbgInfo(true);
+}
+
+inline void tftPrintDbgInfo(boolean useColor) { //useColor = false used only in clean LCD function
+  if (useColor) {
+    prev_steerValue = steerValue;
+    prev_accelValue = accelValue; 
+  }
+
+  if (useColor) tft.setTextColor(ST7735_WHITE);
+  tft.setTextSize(3);
+  tft.print(prev_accelValue); tft.print(" L/R:"); tft.println(prev_steerValue); 
+}
 
