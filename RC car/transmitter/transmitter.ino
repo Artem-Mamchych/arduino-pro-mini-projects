@@ -26,7 +26,7 @@ long lastDebounceTime = 0; // the last time the output pin was toggled
 int joystickButtonState = 0;
 int lastJoystickButtonState = LOW; // the previous reading from the input pin
 
-#define PIN_STEER_SERVO 2
+#define PIN_STEER_SERVO 6
 
 #define ADC_SAMPLES 4 //how many samples to take and average ADC readings
 int samples[ADC_SAMPLES];
@@ -106,7 +106,7 @@ void handleJoystickButtonPress() {
         Serial.println(" ");
         #endif
         
-        if (accelLimit < 0) {
+        if (accelLimit <= 0) {
           #ifdef SERIAL_DEBUG
             Serial.println("Reset to NUMBER_ACCELERATION_SEPEEDLITITS ");
           #endif
@@ -145,7 +145,16 @@ int smoothAnalogRead(int pin) {
 void loop() {
   handleJoystickButtonPress();
   throttle = smoothAnalogRead(PIN_X);
-  accelValue = map(throttle, 0, 1023, 0, 179);  
+//  int maxThrottleWithLimit = 1023;
+//  if (throttle != 0) {
+//    throttle /= accelLimit; //Limits maximum speed. This limit can be turned off or set to value from 1 to 5.
+//    maxThrottleWithLimit /= accelLimit;
+//  }
+  
+//  int minPwm = 0 + 90
+//  int maxPwm = 179 - 90
+  
+  accelValue = map(throttle, 0, 1023, 0, 179);
   
   steer = smoothAnalogRead(PIN_Y);
   steerValue = map(steer, 0, 1023, 0, 179);
@@ -163,16 +172,20 @@ void loop() {
 //    Serial.print(" Y centered");
     if (previousSteerValue != steerValue) {
       previousSteerValue = steerValue;
-      myservo.attach(PIN_STEER_SERVO); 
+//      myservo.attach(PIN_STEER_SERVO); 
+    Serial.print("Y centered myservo.write=");
+    Serial.println(steerValue); 
       myservo.write(steerValue);
       delay(20);
-      myservo.detach();
+//      myservo.detach();
     }
   } else {
-    myservo.attach(PIN_STEER_SERVO); 
+//    myservo.attach(PIN_STEER_SERVO); 
+    Serial.print("myservo.write=");
+    Serial.println(steerValue); 
     myservo.write(steerValue);
     delay(20);
-    myservo.detach();  
+//    myservo.detach();  
   }
   
   unsigned long currentMillis = millis();
